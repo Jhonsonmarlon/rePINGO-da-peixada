@@ -8,7 +8,7 @@ import { Toaster } from "@/components/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "rePINGO da Peixada - Biblioteca de Jogos Sorteáveis",
+  title: "rePINGO - Biblioteca de Jogos Sorteáveis",
   description: "Sistema interativo para sortear jogos entre amigos",
   icons: {
     icon: "/faviconofc.png",
