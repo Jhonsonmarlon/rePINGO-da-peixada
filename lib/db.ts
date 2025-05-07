@@ -1,76 +1,30 @@
-import mysql from "mysql2/promise"
+import { createServerSupabaseClient } from "./supabase"
+import type { Game } from "@/components/game-library"
 
-// Configuração para conexão com o MySQL do Railway
-const dbConfig = {
-  // Usar o host público do Railway em vez do interno
-  host: process.env.DB_HOST || "switchback.proxy.rlwy.net",
-  // Usar a porta pública do Railway (15964 no seu caso)
-  port: Number.parseInt(process.env.DB_PORT || "15964", 10),
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "yPZMIrSPYXypuUfvbcIscAkLMpXfEATo",
-  database: process.env.DB_NAME || "railway",
-}
-
-// Função para criar um pool de conexões com o banco de dados
-export async function getConnection() {
-  try {
-    console.log("Conectando ao banco de dados com as seguintes configurações:", {
-      host: dbConfig.host,
-      port: dbConfig.port,
-      user: dbConfig.user,
-      database: dbConfig.database,
-      // Não logamos a senha por motivos de segurança
-    })
-
-    const pool = mysql.createPool({
-      ...dbConfig,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      ssl: {
-        // Necessário para conexões seguras com o Railway
-        rejectUnauthorized: false,
-      },
-    })
-
-    return pool
-  } catch (error) {
-    console.error("Erro ao conectar ao banco de dados:", error)
-    throw new Error("Não foi possível conectar ao banco de dados")
-  }
-}
-
-// Função para inicializar o banco de dados (criar tabela se não existir)
+// Função para inicializar o banco de dados (verificar se as tabelas existem)
 export async function initDatabase() {
   try {
-    const pool = await getConnection()
+    const supabase = createServerSupabaseClient()
 
-    // Criar tabela de jogos se não existir
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS games (
-        id VARCHAR(36) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        description TEXT NOT NULL,
-        maxPlayers INT NOT NULL,
-        availableOnHydra BOOLEAN NOT NULL DEFAULT false,
-        imageUrl TEXT,
-        addedBy VARCHAR(255) NOT NULL,
-        played BOOLEAN NOT NULL DEFAULT false,
-        createdAt BIGINT NOT NULL
-      )
-    `)
+    // Verificar se as tabelas existem consultando os metadados
+    const { data: gamesExists, error: gamesError } = await supabase.from("games").select("id").limit(1)
 
-    // Criar tabela para armazenar o jogo sorteado
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS selected_game (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        game_id VARCHAR(36) NOT NULL,
-        selected_at BIGINT NOT NULL,
-        FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
-      )
-    `)
+    if (gamesError && !gamesError.message.includes("does not exist")) {
+      console.error("Erro ao verificar tabela games:", gamesError)
+      return false
+    }
 
-    console.log("Banco de dados inicializado com sucesso")
+    const { data: selectedGameExists, error: selectedGameError } = await supabase
+      .from("selected_game")
+      .select("id")
+      .limit(1)
+
+    if (selectedGameError && !selectedGameError.message.includes("does not exist")) {
+      console.error("Erro ao verificar tabela selected_game:", selectedGameError)
+      return false
+    }
+
+    console.log("Conexão com o Supabase estabelecida com sucesso")
     return true
   } catch (error) {
     console.error("Erro ao inicializar o banco de dados:", error)
@@ -78,3 +32,179 @@ export async function initDatabase() {
   }
 }
 
+// Função para buscar todos os jogos
+export async function getAllGames() {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase.from("games").select("*").order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return data || []
+  } catch (error) {
+    console.error("Erro ao buscar jogos:", error)
+    throw error
+  }
+}
+
+// Função para adicionar um novo jogo
+export async function addGameToDb(game: Game) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from("games")
+      .insert([
+        {
+          id: game.id,
+          name: game.name,
+          description: game.description,
+          max_players: game.maxPlayers,
+          available_on_hydra: game.availableOnHydra,
+          image_url: game.imageUrl || "",
+          added_by: game.addedBy,
+          played: game.played,
+          created_at: game.createdAt,
+        },
+      ])
+      .select()
+
+    if (error) throw error
+
+    return data?.[0] || null
+  } catch (error) {
+    console.error("Erro ao adicionar jogo:", error)
+    throw error
+  }
+}
+
+// Função para atualizar um jogo existente
+export async function updateGameInDb(game: Game) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from("games")
+      .update({
+        name: game.name,
+        description: game.description,
+        max_players: game.maxPlayers,
+        available_on_hydra: game.availableOnHydra,
+        image_url: game.imageUrl || "",
+        added_by: game.addedBy,
+        played: game.played,
+      })
+      .eq("id", game.id)
+      .select()
+
+    if (error) throw error
+
+    return data?.[0] || null
+  } catch (error) {
+    console.error("Erro ao atualizar jogo:", error)
+    throw error
+  }
+}
+
+// Função para excluir um jogo
+export async function deleteGameFromDb(id: string) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { error } = await supabase.from("games").delete().eq("id", id)
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Erro ao excluir jogo:", error)
+    throw error
+  }
+}
+
+// Função para atualizar o status "played" de um jogo
+export async function updateGamePlayedStatus(id: string, played: boolean) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase.from("games").update({ played }).eq("id", id).select()
+
+    if (error) throw error
+
+    return data?.[0] || null
+  } catch (error) {
+    console.error("Erro ao atualizar status do jogo:", error)
+    throw error
+  }
+}
+
+// Função para salvar o jogo sorteado
+export async function saveSelectedGameToDb(gameId: string) {
+  try {
+    const supabase = createServerSupabaseClient()
+
+    // Primeiro, limpar registros anteriores
+    await supabase.from("selected_game").delete().neq("id", 0) // Condição para deletar todos os registros
+
+    // Depois, inserir o novo jogo sorteado
+    const { data, error } = await supabase
+      .from("selected_game")
+      .insert([
+        {
+          game_id: gameId,
+          selected_at: Date.now(),
+        },
+      ])
+      .select()
+
+    if (error) throw error
+
+    return data?.[0] || null
+  } catch (error) {
+    console.error("Erro ao salvar jogo sorteado:", error)
+    throw error
+  }
+}
+
+// Função para buscar o jogo sorteado mais recente
+export async function getSelectedGameFromDb() {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase
+      .from("selected_game")
+      .select("game_id, selected_at")
+      .order("selected_at", { ascending: false })
+      .limit(1)
+
+    if (error) throw error
+
+    if (!data || data.length === 0) {
+      return null
+    }
+
+    // Buscar os detalhes do jogo
+    const { data: gameData, error: gameError } = await supabase
+      .from("games")
+      .select("*")
+      .eq("id", data[0].game_id)
+      .limit(1)
+
+    if (gameError) throw gameError
+
+    return gameData?.[0] || null
+  } catch (error) {
+    console.error("Erro ao buscar jogo sorteado:", error)
+    throw error
+  }
+}
+
+// Função para buscar um jogo específico pelo ID
+export async function getGameById(id: string) {
+  try {
+    const supabase = createServerSupabaseClient()
+    const { data, error } = await supabase.from("games").select("*").eq("id", id).limit(1)
+
+    if (error) throw error
+
+    return data?.[0] || null
+  } catch (error) {
+    console.error("Erro ao buscar jogo por ID:", error)
+    throw error
+  }
+}

@@ -7,13 +7,12 @@ export async function GET() {
     const success = await initDatabase()
 
     if (success) {
-      return NextResponse.json({ message: "Banco de dados inicializado com sucesso" })
+      return NextResponse.json({ message: "Conexão com o Supabase estabelecida com sucesso" })
     } else {
-      return NextResponse.json({ error: "Erro ao inicializar o banco de dados" }, { status: 500 })
+      return NextResponse.json({ error: "Erro ao conectar com o Supabase" }, { status: 500 })
     }
   } catch (error) {
     console.error("Erro ao inicializar o banco de dados:", error)
     return NextResponse.json({ error: "Erro ao inicializar o banco de dados" }, { status: 500 })
   }
 }
-

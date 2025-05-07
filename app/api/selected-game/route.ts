@@ -1,26 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getConnection } from "@/lib/db"
+import { getSelectedGameFromDb, saveSelectedGameToDb } from "@/lib/db"
 
 // GET - Buscar o jogo sorteado mais recente
 export async function GET() {
   try {
-    const pool = await getConnection()
+    const game = await getSelectedGameFromDb()
 
-    // Buscar o jogo sorteado mais recente
-    const [rows] = await pool.query(`
-      SELECT g.* FROM games g
-      JOIN selected_game sg ON g.id = sg.game_id
-      ORDER BY sg.selected_at DESC
-      LIMIT 1
-    `)
-
-    const games = rows as any[]
-
-    if (games.length === 0) {
+    if (!game) {
       return NextResponse.json({ message: "Nenhum jogo sorteado encontrado" }, { status: 404 })
     }
 
-    return NextResponse.json(games[0])
+    // Mapear os nomes das colunas do Supabase para o formato esperado pelo frontend
+    const mappedGame = {
+      id: game.id,
+      name: game.name,
+      description: game.description,
+      maxPlayers: game.max_players,
+      availableOnHydra: game.available_on_hydra,
+      imageUrl: game.image_url || "",
+      addedBy: game.added_by,
+      played: game.played,
+      createdAt: game.created_at,
+    }
+
+    return NextResponse.json(mappedGame)
   } catch (error: any) {
     console.error("Erro ao buscar jogo sorteado:", error)
     return NextResponse.json(
@@ -42,19 +45,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ID do jogo é obrigatório" }, { status: 400 })
     }
 
-    const pool = await getConnection()
+    const savedGame = await saveSelectedGameToDb(gameId)
 
-    // Verificar se o jogo existe
-    const [gameRows] = await pool.query("SELECT * FROM games WHERE id = ?", [gameId])
-    const games = gameRows as any[]
-
-    if (games.length === 0) {
-      return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 })
+    if (!savedGame) {
+      return NextResponse.json({ error: "Erro ao salvar jogo sorteado" }, { status: 500 })
     }
-
-    // Limpar registros anteriores e inserir o novo jogo sorteado
-    await pool.query("DELETE FROM selected_game")
-    await pool.query("INSERT INTO selected_game (game_id, selected_at) VALUES (?, ?)", [gameId, Date.now()])
 
     return NextResponse.json({ success: true, gameId })
   } catch (error: any) {
@@ -68,4 +63,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

@@ -114,4 +114,3 @@ export default function GameProgress({ games, isSelecting, selectedGame, onSelec
     </div>
   )
 }
-

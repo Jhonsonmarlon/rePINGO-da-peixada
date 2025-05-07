@@ -1,26 +1,28 @@
 import { NextResponse } from "next/server"
-import { getConnection } from "@/lib/db"
+import { createServerSupabaseClient } from "@/lib/supabase"
 
 export async function GET() {
   try {
-    // Tentar estabelecer conexão com o banco de dados
-    const pool = await getConnection()
+    // Tentar estabelecer conexão com o Supabase
+    const supabase = createServerSupabaseClient()
 
     // Verificar se a conexão está funcionando com uma consulta simples
-    const [result] = await pool.query("SELECT 1 as test")
+    const { data, error } = await supabase.from("games").select("id").limit(1)
+
+    if (error) throw error
 
     // Verificar as variáveis de ambiente (sem mostrar senhas)
     const envInfo = {
-      DB_HOST: process.env.DB_HOST ? "Configurado" : "Não configurado",
-      DB_USER: process.env.DB_USER ? "Configurado" : "Não configurado",
-      DB_NAME: process.env.DB_NAME ? "Configurado" : "Não configurado",
-      DB_PASSWORD: process.env.DB_PASSWORD ? "Configurado" : "Não configurado",
+      SUPABASE_URL: process.env.SUPABASE_URL ? "Configurado" : "Não configurado",
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? "Configurado" : "Não configurado",
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "Configurado" : "Não configurado",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Configurado" : "Não configurado",
     }
 
     return NextResponse.json({
       status: "success",
-      message: "Conexão com o banco de dados estabelecida com sucesso",
-      dbTest: result,
+      message: "Conexão com o Supabase estabelecida com sucesso",
+      dbTest: data,
       envInfo,
     })
   } catch (error: any) {
@@ -29,18 +31,17 @@ export async function GET() {
     return NextResponse.json(
       {
         status: "error",
-        message: "Erro ao conectar ao banco de dados",
+        message: "Erro ao conectar ao Supabase",
         error: error.message,
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
         envInfo: {
-          DB_HOST: process.env.DB_HOST ? "Configurado" : "Não configurado",
-          DB_USER: process.env.DB_USER ? "Configurado" : "Não configurado",
-          DB_NAME: process.env.DB_NAME ? "Configurado" : "Não configurado",
-          DB_PASSWORD: process.env.DB_PASSWORD ? "Configurado" : "Não configurado",
+          SUPABASE_URL: process.env.SUPABASE_URL ? "Configurado" : "Não configurado",
+          SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? "Configurado" : "Não configurado",
+          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? "Configurado" : "Não configurado",
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Configurado" : "Não configurado",
         },
       },
       { status: 500 },
     )
   }
 }
-

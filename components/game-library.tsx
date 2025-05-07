@@ -1,9 +1,7 @@
 "use client"
 
 import { Checkbox } from "@/components/ui/checkbox"
-
 import type React from "react"
-
 import { useState, useEffect, useMemo, useRef } from "react"
 import {
   Plus,
@@ -22,12 +20,15 @@ import {
   Instagram,
   FileText,
   Linkedin,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
 import {
   Dialog,
   DialogContent,
@@ -48,7 +49,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import GameList from "./game-list"
 import GameDetails from "./game-details"
 import GameProgress from "./game-progress"
 import {
@@ -60,6 +60,7 @@ import {
   saveSelectedGame,
   fetchSelectedGame,
 } from "@/lib/api"
+import GameCard from "./game-card"
 
 export type Game = {
   id: string
@@ -94,6 +95,14 @@ export default function GameLibrary() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState("")
+  const [maxPlayersFilter, setMaxPlayersFilter] = useState([10])
+  const [showOnlyUnplayed, setShowOnlyUnplayed] = useState(false)
+  const [showOnlyHydra, setShowOnlyHydra] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const gamesPerPage = 12
+
   // Form state
   const [newGame, setNewGame] = useState({
     name: "",
@@ -108,27 +117,43 @@ export default function GameLibrary() {
   // Edit form state
   const [editGame, setEditGame] = useState<Game | null>(null)
 
-  // Sort games: unplayed first (newest to oldest), then played (oldest to newest)
-  const sortedGames = useMemo(() => {
-    return [...games].sort((a, b) => {
-      // If one is played and the other isn't, the unplayed one comes first
-      if (a.played !== b.played) {
-        return a.played ? 1 : -1
+  // Filtrar jogos
+  const filteredGames = useMemo(() => {
+    return games.filter((game) => {
+      // Filtro de busca
+      if (
+        searchQuery &&
+        !game.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !game.description.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
+        return false
       }
 
-      // If both are played or both are unplayed, sort by creation time
-      const aTime = a.createdAt || 0
-      const bTime = b.createdAt || 0
-
-      // For unplayed games, newest first (descending)
-      if (!a.played) {
-        return bTime - aTime
+      // Filtro de jogadores máximos
+      if (game.maxPlayers > maxPlayersFilter[0]) {
+        return false
       }
 
-      // For played games, oldest first (ascending)
-      return aTime - bTime
+      // Filtro de jogos não jogados
+      if (showOnlyUnplayed && game.played) {
+        return false
+      }
+
+      // Filtro de jogos disponíveis na Hydra
+      if (showOnlyHydra && !game.availableOnHydra) {
+        return false
+      }
+
+      return true
     })
-  }, [games])
+  }, [games, searchQuery, maxPlayersFilter, showOnlyUnplayed, showOnlyHydra])
+
+  // Paginação
+  const totalPages = Math.ceil(filteredGames.length / gamesPerPage)
+  const paginatedGames = useMemo(() => {
+    const startIndex = (currentPage - 1) * gamesPerPage
+    return filteredGames.slice(startIndex, startIndex + gamesPerPage)
+  }, [filteredGames, currentPage])
 
   // Filtrar apenas jogos não jogados para o sorteio
   const unplayedGames = useMemo(() => {
@@ -165,6 +190,11 @@ export default function GameLibrary() {
   useEffect(() => {
     initializeAndLoadGames()
   }, [])
+
+  // Resetar página quando os filtros mudam
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, maxPlayersFilter, showOnlyUnplayed, showOnlyHydra])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -548,9 +578,17 @@ export default function GameLibrary() {
     }
   }
 
+  const handleClearFilters = () => {
+    setSearchQuery("")
+    setMaxPlayersFilter([10])
+    setShowOnlyUnplayed(false)
+    setShowOnlyHydra(false)
+    setCurrentPage(1)
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8 relative">
-      <header className="text-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-green-800 to-teal-900">
+      <header className="text-center py-6 px-4">
         <div className="flex justify-center mb-4">
           <motion.div
             initial={{ y: -20, opacity: 0 }}
@@ -561,94 +599,173 @@ export default function GameLibrary() {
             <img
               src="/logoofc.png"
               alt="Logo rePINGO da Peixada"
-              className="h-24 md:h-32 w-auto filter drop-shadow-lg"
+              className="h-20 md:h-24 w-auto filter drop-shadow-lg"
             />
-            <motion.div
-              animate={{
-                rotate: [0, 5, 0, -5, 0],
-                x: [0, 3, 0, -3, 0],
-              }}
-              transition={{
-                repeat: Number.POSITIVE_INFINITY,
-                duration: 5,
-                ease: "easeInOut",
-              }}
-              className="absolute inset-0 opacity-0 hover:opacity-100"
-            >
-              <img
-                src="/logoofc.png"
-                alt="Logo rePINGO da Peixada animada"
-                className="h-24 md:h-32 w-auto filter drop-shadow-lg"
-              />
-            </motion.div>
           </motion.div>
         </div>
 
-        <h1 className="text-4xl font-bold text-green-100 mb-2 flex items-center justify-center">
-          <Gamepad2 className="w-8 h-8 mr-2 text-green-300" />
+        <h1 className="text-3xl font-bold text-green-100 mb-2 flex items-center justify-center">
+          <Gamepad2 className="w-7 h-7 mr-2 text-green-300" />
           rePINGO da Peixada
-          <Gamepad2 className="w-8 h-8 ml-2 text-green-300" />
+          <Gamepad2 className="w-7 h-7 ml-2 text-green-300" />
         </h1>
-        <p className="text-green-200 text-xl">Biblioteca de Jogos Sorteáveis</p>
-        <div className="flex justify-center gap-4 mt-2">
-          <Button
-            onClick={handleRefresh}
-            variant="outline"
-            className="text-green-200 border-green-500 hover:bg-green-800"
-            disabled={isLoading}
-          >
-            <RefreshCcw className="w-4 h-4 mr-1" />
-            Atualizar Jogos
-          </Button>
-        </div>
+        <p className="text-green-200 text-lg">Biblioteca de Jogos Sorteáveis</p>
       </header>
 
       {error && (
-        <div className="mb-8 p-4 bg-red-900/50 border border-red-500 rounded-lg text-center">
-          <div className="flex items-center justify-center mb-2">
-            <AlertTriangle className="w-6 h-6 text-red-400 mr-2" />
-            <h3 className="text-lg font-semibold text-red-200">Erro de Conexão</h3>
+        <div className="max-w-7xl mx-auto px-4 mb-6">
+          <div className="p-4 bg-red-900/50 border border-red-500 rounded-lg text-center">
+            <div className="flex items-center justify-center mb-2">
+              <AlertTriangle className="w-6 h-6 text-red-400 mr-2" />
+              <h3 className="text-lg font-semibold text-red-200">Erro de Conexão</h3>
+            </div>
+            <p className="text-red-200">{error}</p>
+            <Button onClick={handleRefresh} variant="destructive" className="mt-2 bg-red-700 hover:bg-red-600">
+              Tentar Novamente
+            </Button>
           </div>
-          <p className="text-red-200">{error}</p>
-          <Button onClick={handleRefresh} variant="destructive" className="mt-2 bg-red-700 hover:bg-red-600">
-            Tentar Novamente
-          </Button>
         </div>
       )}
 
-      <div className="flex flex-col gap-8">
-        {/* Roda de Sorteio */}
-        <Card className="bg-green-800/40 border-green-600 shadow-xl backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-green-100">Roda de Sorteio</h2>
+      <div className="max-w-7xl mx-auto px-4 pb-12">
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Sidebar com filtros */}
+          <div className="w-full md:w-64 flex-shrink-0">
+            <div className="bg-green-800/40 border border-green-600 rounded-lg p-4 sticky top-4">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-green-100 mb-3">Filtros</h2>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-green-400" />
+                  <Input
+                    placeholder="Buscar jogos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 bg-green-900/50 border-green-600 text-white placeholder:text-green-400"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-green-200 mb-2">Máximo de Jogadores</h3>
+                <div className="space-y-3">
+                  <Slider
+                    value={maxPlayersFilter}
+                    onValueChange={setMaxPlayersFilter}
+                    max={10}
+                    min={1}
+                    step={1}
+                    className="py-2"
+                  />
+                  <div className="flex justify-between text-xs text-green-300">
+                    <span>1</span>
+                    <span>{maxPlayersFilter[0]}</span>
+                    <span>10</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="only-unplayed"
+                    checked={showOnlyUnplayed}
+                    onCheckedChange={(checked) => setShowOnlyUnplayed(!!checked)}
+                    className="border-green-500 data-[state=checked]:bg-green-500"
+                  />
+                  <Label htmlFor="only-unplayed" className="text-green-200">
+                    Apenas não jogados
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="only-hydra"
+                    checked={showOnlyHydra}
+                    onCheckedChange={(checked) => setShowOnlyHydra(!!checked)}
+                    className="border-green-500 data-[state=checked]:bg-green-500"
+                  />
+                  <Label htmlFor="only-hydra" className="text-green-200">
+                    Disponível na Hydra
+                  </Label>
+                </div>
+              </div>
+
               <Button
-                onClick={handleDrawClick}
-                disabled={isSpinning || unplayedGames.length === 0 || isLoading}
-                className="bg-green-500 hover:bg-green-600 text-white"
+                onClick={handleClearFilters}
+                variant="outline"
+                className="w-full border-green-500 text-green-200 hover:bg-green-700/50"
               >
-                {isSpinning ? (
-                  "Sorteando..."
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 mr-1" /> Sortear Jogo
-                  </>
-                )}
+                Limpar filtros
               </Button>
+
+              <div className="mt-6 space-y-3">
+                <Button
+                  onClick={handleDrawClick}
+                  disabled={isSpinning || unplayedGames.length === 0 || isLoading}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                >
+                  {isSpinning ? (
+                    "Sorteando..."
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-1" /> Sortear Jogo
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => setShowAddGameModal(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  disabled={isLoading}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar Jogo
+                </Button>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={exportGamesToFile}
+                    className="flex-1 bg-green-700 hover:bg-green-800 text-white"
+                    disabled={isLoading || games.length === 0}
+                    title="Exportar Jogos"
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={handleImportClick}
+                    className="flex-1 bg-green-700 hover:bg-green-800 text-white"
+                    disabled={isLoading}
+                    title="Importar Jogos"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={handleRefresh}
+                    className="flex-1 bg-green-700 hover:bg-green-800 text-white"
+                    disabled={isLoading}
+                    title="Atualizar Jogos"
+                  >
+                    <RefreshCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={importGamesFromFile}
+                  accept=".json"
+                  className="hidden"
+                />
+              </div>
             </div>
+          </div>
 
-            <GameProgress
-              games={unplayedGames}
-              isSelecting={isSpinning}
-              selectedGame={selectedGame}
-              onSelectionComplete={handleSelectionComplete}
-            />
-
+          {/* Conteúdo principal */}
+          <div className="flex-1">
+            {/* Jogo sorteado */}
             {selectedGame && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-8 p-4 bg-green-700/60 rounded-lg border border-green-500 shadow-lg"
+                className="mb-6 p-4 bg-green-700/60 rounded-lg border border-green-500 shadow-lg"
               >
                 <h3 className="text-xl font-bold text-green-100 mb-2">Jogo da Vez</h3>
                 <div className="flex items-center">
@@ -672,63 +789,123 @@ export default function GameLibrary() {
                 </div>
               </motion.div>
             )}
-          </CardContent>
-        </Card>
 
-        {/* Biblioteca de Jogos */}
-        <Card className="bg-green-800/40 border-green-600 shadow-xl backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-green-100">Biblioteca de Jogos</h2>
-              <div className="flex gap-2">
-                <Button
-                  onClick={exportGamesToFile}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={isLoading || games.length === 0}
-                  title="Exportar Jogos"
-                >
-                  <Download className="w-4 h-4 mr-1" /> Exportar
-                </Button>
-                <Button
-                  onClick={handleImportClick}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={isLoading}
-                  title="Importar Jogos"
-                >
-                  <Upload className="w-4 h-4 mr-1" /> Importar
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={importGamesFromFile}
-                  accept=".json"
-                  className="hidden"
+            {/* Roda de sorteio (visível apenas quando está sorteando) */}
+            {isSpinning && (
+              <div className="mb-6">
+                <GameProgress
+                  games={unplayedGames}
+                  isSelecting={isSpinning}
+                  selectedGame={selectedGame}
+                  onSelectionComplete={handleSelectionComplete}
                 />
-                <Button
-                  onClick={() => setShowAddGameModal(true)}
-                  className="bg-green-500 hover:bg-green-600 text-white"
-                  disabled={isLoading}
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar
-                </Button>
               </div>
-            </div>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center h-40">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-              </div>
-            ) : (
-              <GameList
-                games={sortedGames}
-                onViewDetails={handleViewGameDetails}
-                onTogglePlayed={handleToggleGamePlayed}
-                onEditGame={handleEditGame}
-                onDeleteGame={handleConfirmDelete}
-              />
             )}
-          </CardContent>
-        </Card>
+
+            {/* Grid de jogos */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-green-100">
+                  Biblioteca de Jogos{" "}
+                  <span className="text-sm font-normal text-green-300">({filteredGames.length} jogos encontrados)</span>
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-green-500 text-green-200 hover:bg-green-700/50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-green-200">
+                    Página {currentPage} de {Math.max(1, totalPages)}
+                  </span>
+                  <Button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-green-500 text-green-200 hover:bg-green-700/50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+                </div>
+              ) : paginatedGames.length === 0 ? (
+                <div className="flex items-center justify-center h-64 bg-green-800/30 rounded-lg border border-green-700">
+                  <p className="text-green-300">Nenhum jogo encontrado com os filtros atuais.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {paginatedGames.map((game) => (
+                    <GameCard
+                      key={game.id}
+                      game={game}
+                      onView={handleViewGameDetails}
+                      onEdit={handleEditGame}
+                      onDelete={handleConfirmDelete}
+                      onTogglePlayed={handleToggleGamePlayed}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Paginação inferior */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-6">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      variant="outline"
+                      size="sm"
+                      className="border-green-500 text-green-200 hover:bg-green-700/50"
+                    >
+                      Primeira
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-green-500 text-green-200 hover:bg-green-700/50"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-green-200">
+                      {currentPage} de {totalPages}
+                    </span>
+                    <Button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage >= totalPages}
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border-green-500 text-green-200 hover:bg-green-700/50"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage >= totalPages}
+                      variant="outline"
+                      size="sm"
+                      className="border-green-500 text-green-200 hover:bg-green-700/50"
+                    >
+                      Última
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Botões de diagnóstico e informações no canto inferior esquerdo */}
@@ -1153,4 +1330,3 @@ export default function GameLibrary() {
     </div>
   )
 }
-

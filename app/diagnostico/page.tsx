@@ -39,7 +39,7 @@ export default function DiagnosticoPage() {
           <CardHeader>
             <CardTitle className="text-xl text-green-100 flex items-center">
               <Database className="mr-2 h-6 w-6" />
-              Status da Conexão com o Banco de Dados
+              Status da Conexão com o Supabase
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -128,12 +128,12 @@ export default function DiagnosticoPage() {
             <CardTitle className="text-xl text-green-100">Próximos Passos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-green-200">
-            <p>Se o diagnóstico mostrar problemas de conexão com o banco de dados, verifique:</p>
+            <p>Se o diagnóstico mostrar problemas de conexão com o Supabase, verifique:</p>
             <ol className="list-decimal pl-5 space-y-2">
-              <li>Se as variáveis de ambiente estão configuradas corretamente no Vercel</li>
-              <li>Se o banco de dados MySQL está acessível a partir da internet</li>
-              <li>Se as credenciais do banco de dados estão corretas</li>
-              <li>Se o usuário do banco de dados tem permissões para criar tabelas e manipular dados</li>
+              <li>Se as variáveis de ambiente do Supabase estão configuradas corretamente no Vercel</li>
+              <li>Se o projeto do Supabase está ativo e acessível</li>
+              <li>Se as credenciais do Supabase estão corretas</li>
+              <li>Se as tabelas necessárias foram criadas no banco de dados</li>
             </ol>
             <p className="mt-4">
               Após corrigir os problemas, clique em "Verificar Novamente" para atualizar o diagnóstico.
@@ -149,4 +149,3 @@ export default function DiagnosticoPage() {
     </div>
   )
 }
-
