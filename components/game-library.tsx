@@ -606,7 +606,7 @@ export default function GameLibrary() {
 
         <h1 className="text-3xl font-bold text-green-100 mb-2 flex items-center justify-center">
           <Gamepad2 className="w-7 h-7 mr-2 text-green-300" />
-          rePINGO da Peixada
+          REpingo Games
           <Gamepad2 className="w-7 h-7 ml-2 text-green-300" />
         </h1>
         <p className="text-green-200 text-lg">Biblioteca de Jogos Sorteáveis</p>
